@@ -4,7 +4,7 @@
 include service.server;
 
 # Initialize root node on server startup
-walker init_root {
+walker: pub init_root {
     can setup with `root entry {
         print("Root node initialized successfully");
     }
@@ -26,25 +26,13 @@ cl import "./global.css";
 cl {
     def:pub app() -> any {
         
-        async def handle_query(query: str) -> any {
-            return await root spawn ask_email(query=query);
-        }
 
-        async def handle_upload(emails: list) -> any {
-            return await root spawn upload_emails(raw_emails=emails);
-        }
-
-        async def handle_get_count() -> any {
-            return await root spawn get_email_count();
-        }
 
         return (
             <div>
-                <EmailBuddyLayout 
-                    onQuery={handle_query}
-                    onUploadEmails={handle_upload}
-                    onGetCount={handle_get_count}
-                />
+            <div>
+                <EmailBuddyLayout />
+            </div>
             </div>
         );
     }

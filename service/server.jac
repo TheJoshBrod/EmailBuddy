@@ -13,7 +13,7 @@ include service.rag;
 include service.prompts;
 
 
-walker:pub load_graph_from_db {
+walker: pub load_graph_from_db {
     can setup with `root entry {
         conn = sqlite3.connect("vectorDB.db");
         cursor = conn.cursor();
@@ -70,7 +70,7 @@ walker:pub load_graph_from_db {
 
 glob conversation_history: list[dict] = [];
 
-walker:pub upload_emails{
+walker: pub upload_emails{
     has raw_emails: list;
     has skip_embedding: bool = False;
 
@@ -190,7 +190,7 @@ walker:pub upload_emails{
     }
 }
 
-walker:pub get_email_count {
+walker: pub get_email_count {
     has count: int = 0;
 
     can start with `root entry {
@@ -199,7 +199,7 @@ walker:pub get_email_count {
     }
 }
 
-walker:pub ask_email {
+walker: pub ask_email {
     has query: str;
 
     def handle_email_query(query: str) -> None {

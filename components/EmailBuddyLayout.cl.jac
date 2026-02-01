@@ -3,6 +3,7 @@ cl import from react { useState, useRef, useEffect }
 cl import from antd { message, Layout }
 cl import from .header.Header { Header }
 cl import from .chatArea.ChatArea { ChatArea }
+cl import from ..service.server { ask_email, upload_emails, get_email_count }
 
 def:pub EmailBuddyLayout(props: dict) -> any {
     # Theme state with safe initialization
@@ -55,7 +56,7 @@ def:pub EmailBuddyLayout(props: dict) -> any {
 
         async def query_backend() -> None {
             # Spawn the ask_email walker
-            response = await props.onQuery(text);
+            response = ask_email(query=text) spawn root;
 
             # The walker reports a list of dictionaries, we access the first report
             botResponse = {};
@@ -82,8 +83,8 @@ def:pub EmailBuddyLayout(props: dict) -> any {
     
     # Fetch email count
     async def fetchEmailCount() -> None {
-        if "onGetCount" in props {
-            response = await props.onGetCount();
+        if True {
+            response = get_email_count() spawn root;
             if response.reports {
                  result = response.reports[0];
                  setEmailCount(result["count"]);
@@ -126,7 +127,7 @@ def:pub EmailBuddyLayout(props: dict) -> any {
                 async def upload() -> None {
                     try {
                         # Spawn upload_emails walker with parsed data
-                        await props.onUploadEmails(emails);
+                        upload_emails(raw_emails=emails) spawn root;
                         message.success(f"Successfully uploaded {emails.length} emails!");
                         await fetchEmailCount();
                     } except any as error {

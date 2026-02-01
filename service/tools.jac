@@ -5,10 +5,10 @@ import from byllm.llm { Model }
 include service.nodes;
 include service.rag;
 
-glob llm = Model(model_name="openai/gpt-5");
+glob llm = Model(model_name="openai/gpt-4o");
 
 
-walker FindRecipientNodes{
+walker:pub FindRecipientNodes{
     has targets: list[tuple[str, str]] = [];
     has missing: list[tuple[str, str]] = [];
     has persons: list[Person] = [];
@@ -36,7 +36,7 @@ walker FindRecipientNodes{
     }
 }
 
-walker FindSenderNode {
+walker:pub FindSenderNode {
     has target: str;
     has person: Person = None;
 
@@ -53,7 +53,7 @@ walker FindSenderNode {
     }    
 }
 
-walker FindEmailNode{
+walker:pub FindEmailNode{
     has targets: list[str] = []; # [uuids]
     has emails: list[EmailNode] = [];
     has target_set: set[str] = set();
@@ -124,7 +124,7 @@ def person_node_to_string(person: Person) -> str{
 }
 
 
-walker PrintGraph {
+walker:pub PrintGraph {
     can start with `root entry {
         print("--- Graph Visualization ---");
         visit [-->];
