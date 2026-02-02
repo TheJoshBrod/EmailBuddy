@@ -3,3 +3,14 @@ body {
     padding: 0;
     overflow: hidden; /* Prevent scrollbars if content fits exactly */
 }
+
+/* Ensure message visibility */
+.cs-message--incoming .cs-message__content {
+    color: #000000 !important;
+    background-color: #e6e6e6 !important;
+}
+
+.cs-message--outgoing .cs-message__content {
+    color: #ffffff !important;
+    background-color: #1890ff !important;
+}

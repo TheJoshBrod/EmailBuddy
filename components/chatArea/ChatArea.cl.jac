@@ -32,7 +32,7 @@ def:pub ChatArea(props: dict) -> any {
             "overflow": "hidden",
             "background": bgColor
         }}>
-            <MainContainer style={{ "border": "none" }}>
+            <MainContainer style={{ "border": "none", "maxWidth": "900px", "margin": "0 auto" }}>
                 <ChatContainer>
                     <MessageList 
                         typingIndicator={typing_indicator}
@@ -45,7 +45,6 @@ def:pub ChatArea(props: dict) -> any {
                                     "sender": msg.sender,
                                     "direction": msg.direction
                                 }}
-                                avatarSpacer={True}
                             />;
                         })}
                     </MessageList>
@@ -59,8 +58,11 @@ def:pub ChatArea(props: dict) -> any {
                         attachButton={False}
                         style={{
                             "padding": "10px",
-                            "borderTop": inputBorder,
-                            "background": inputBg
+                            "borderTop": "none",
+                            "background": inputBg,
+                            "borderRadius": "15px",
+                            "margin": "10px",
+                            "boxShadow": "0 2px 5px rgba(0,0,0,0.1)"
                         }}
                     />
                 </ChatContainer>

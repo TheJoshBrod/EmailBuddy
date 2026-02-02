@@ -30,9 +30,7 @@ cl {
 
         return (
             <div>
-            <div>
                 <EmailBuddyLayout />
-            </div>
             </div>
         );
     }

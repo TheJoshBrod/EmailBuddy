@@ -1,5 +1,5 @@
-cl import from antd { Layout, Typography, Space, Button, Switch }
-cl import from "@ant-design/icons" { UploadOutlined, DeleteOutlined, SunOutlined, MoonOutlined }
+cl import from antd { Layout, Typography, Space, Button, Switch, Tag }
+cl import from "@ant-design/icons" { UploadOutlined, DeleteOutlined, SunOutlined, MoonOutlined, RobotOutlined }
 
 def:pub Header(props: dict) -> any {
     isDark = props.theme == "dark";
@@ -20,6 +20,11 @@ def:pub Header(props: dict) -> any {
         uploadBtnType = "primary";
     }
 
+    tagColor = "cyan";
+    if isDark {
+        tagColor = "blue";
+    }
+
     return (
         <div style={{
             "display": "flex",
@@ -32,12 +37,13 @@ def:pub Header(props: dict) -> any {
             "borderBottom": headerBorder
         }}>
             <div>
-                <Typography.Title level={4} style={{ "margin": 0, "color": titleColor }}>
-                    EmailBuddy
-                </Typography.Title>
-                <Typography.Text type="secondary" style={{ "fontSize": "12px", "color": subColor }}>
-                    {props.messageCount + " emails indexed"}
-                </Typography.Text>
+                <Space>
+                    <RobotOutlined style={{ "fontSize": "24px", "color": titleColor }} />
+                    <Typography.Title level={4} style={{ "margin": 0, "color": titleColor }}>
+                        EmailBuddy
+                    </Typography.Title>
+                    <Tag color={tagColor}>{props.messageCount + " indexed"}</Tag>
+                </Space>
             </div>
 
             <Space>
@@ -61,9 +67,8 @@ def:pub Header(props: dict) -> any {
                     danger={True}
                     icon={<DeleteOutlined />} 
                     onClick={props.onClearChat}
-                >
-                    Clear Chat
-                </Button>
+                    title="Clear Chat"
+                />
             </Space>
         </div>
     );
