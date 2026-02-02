@@ -4,7 +4,7 @@ import datetime;
 def extra_info() -> str{
     
     info: dict = {};
-    with open("service/config.json", "r") as f{
+    with open("service/utils/config.json", "r") as f{
         info = json.load(f);
     }
 

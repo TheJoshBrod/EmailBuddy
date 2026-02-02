@@ -1,7 +1,7 @@
-include service.nodes;
-include service.tools;
-include service.prompts;
-include service.rag;
+include service.graph.nodes;
+include service.graph.tools;
+include service.agent.prompts;
+include service.rag.rag;
 import re;
 
 def extract_text(html_content: str) -> str {

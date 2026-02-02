@@ -4,8 +4,8 @@ Contains all the helper walkers and tool calls.
 
 
 import from byllm.llm { Model }
-include service.nodes;
-include service.rag;
+include service.graph.nodes;
+include service.rag.rag;
 
 glob llm = Model(model_name="openai/gpt-5");
 

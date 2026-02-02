@@ -7,11 +7,11 @@ import typing;
 import sqlite3;
 
 # Jac Files
-include service.tools;
-include service.nodes;
-include service.rag;
-include service.parser;
-include service.agent;
+include service.graph.tools;
+include service.graph.nodes;
+include service.rag.rag;
+include service.utils.parser;
+include service.agent.agent;
 
 
 walker: pub load_graph_from_db {
