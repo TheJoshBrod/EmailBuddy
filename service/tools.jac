@@ -1,14 +1,16 @@
-"""Contains all the helper walkers and tool calls."""
+"""
+Contains all the helper walkers and tool calls.
+"""
 
 
 import from byllm.llm { Model }
 include service.nodes;
 include service.rag;
 
-glob llm = Model(model_name="openai/gpt-4o");
+glob llm = Model(model_name="openai/gpt-5");
 
 
-walker:pub FindRecipientNodes{
+walker: pub FindRecipientNodes{
     has targets: list[tuple[str, str]] = [];
     has missing: list[tuple[str, str]] = [];
     has persons: list[Person] = [];
@@ -36,7 +38,7 @@ walker:pub FindRecipientNodes{
     }
 }
 
-walker:pub FindSenderNode {
+walker: pub FindSenderNode {
     has target: str;
     has person: Person = None;
 
@@ -53,7 +55,7 @@ walker:pub FindSenderNode {
     }    
 }
 
-walker:pub FindEmailNode{
+walker: pub FindEmailNode{
     has targets: list[str] = []; # [uuids]
     has emails: list[EmailNode] = [];
     has target_set: set[str] = set();
@@ -120,11 +122,12 @@ def email_node_to_string(email: EmailNode) -> str{
 def person_node_to_string(person: Person) -> str{
     output: str = "";
     output += "Name:\n" + person.name;
+    output += "\nEmail:\n" + person.email;
     return output;
 }
 
 
-walker:pub PrintGraph {
+walker: pub PrintGraph {
     can start with `root entry {
         print("--- Graph Visualization ---");
         visit [-->];
@@ -180,9 +183,18 @@ def choose_initial_email_node(emails: list[str], conversation_history: list[dict
 
 
 """
-Answer the user's initial question with context given.
+answer_context: The extracted answer or context found by the agent.
+convo_history: The conversation history to maintain context.
+Answer the user's initial question using the answer_context as the primary source of truth.
 """
-def respond_to_user(convo_history: list[dict]) -> str by llm();
+def generate_answer(answer_context: str, convo_history: list[dict]) -> str by llm();
+
+"""
+answer_context: The context or answer found by the agent.
+convo_history: The conversation history.
+Respond to the user based on the answer_context.
+"""
+def respond_to_user(answer_context: str, convo_history: list[dict]) -> str by llm();
 
 """
 You failed to extract the identifier, try again.

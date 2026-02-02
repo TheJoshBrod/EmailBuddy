@@ -56,7 +56,7 @@ def:pub EmailBuddyLayout(props: dict) -> any {
 
         async def query_backend() -> None {
             # Spawn the ask_email walker
-            response = ask_email(query=text) spawn root;
+            response = ask_email(query=text, chat_history=messages) spawn root;
 
             # The walker reports a list of dictionaries, we access the first report
             botResponse = {};

@@ -10,7 +10,8 @@ import sqlite3;
 include service.tools;
 include service.nodes;
 include service.rag;
-include service.prompts;
+include service.parser;
+include service.agent;
 
 
 walker: pub load_graph_from_db {
@@ -27,26 +28,8 @@ walker: pub load_graph_from_db {
             
             for row in rows {
                 content = row[0];
-                # Parse the content string back into a dict
-                # Format: "date: <...>\nsender: <...>\nrecipient: <...>\nsubject: <...>\n\nbody:<...>"
-                
-                email_data = {};
-                
-                # Simple extraction using split (assuming standard format from create_email_embedding)
-                lines = content.split('\n');
-                for line in lines {
-                    if line.startswith("date: <") {
-                        email_data["date"] = line.split("date: <")[1].strip(">");
-                    } elif line.startswith("sender: <") {
-                        email_data["from"] = line.split("sender: <")[1].strip(">");
-                    } elif line.startswith("recipient: <") {
-                        email_data["to"] = line.split("recipient: <")[1].strip(">");
-                    } elif line.startswith("subject: <") {
-                        email_data["subject"] = line.split("subject: <")[1].strip(">");
-                    } elif line.startswith("body:<") {
-                        email_data["body"] = line.split("body:<")[1].strip(">");
-                    }
-                }
+                # Use robust parsing
+                email_data = parse_email_content(content);
                 
                 if "from" in email_data {
                     emails_to_restore.append(email_data);
@@ -54,10 +37,7 @@ walker: pub load_graph_from_db {
             }
             
             if len(emails_to_restore) > 0 {
-                print(f"Restoring {len(emails_to_restore)} emails from database...");
                 root spawn upload_emails(raw_emails=emails_to_restore, skip_embedding=True);
-            } else {
-                print("No emails found in database to restore.");
             }
             
         } except Exception as e {
@@ -68,7 +48,7 @@ walker: pub load_graph_from_db {
     }
 }
 
-glob conversation_history: list[dict] = [];
+
 
 walker: pub upload_emails{
     has raw_emails: list;
@@ -201,297 +181,10 @@ walker: pub get_email_count {
 
 walker: pub ask_email {
     has query: str;
+    has chat_history: list[dict] = [];
 
-    def handle_email_query(query: str) -> None {
-        # Initialized vars
-        initial_emails: list[EmailNode] = [];
-        option: str = "@query@";
-
-        # Loops until finds satisfiable email to explore
-        query_counter: int = 0;
-        while option == "@query@" and query_counter < 4 {
-
-            # Prevents infinite looping
-            query_counter += 1;
-            
-            # Get starting nodes of emails to explore
-            starting_emails: tuple[str] = find_emails(query);
-            uuids: list[str] = [email[0] for email in starting_emails];
-            FindEmails = FindEmailNode(targets=uuids);
-            root spawn FindEmails;
-
-            # Choose which email to travel to
-            initial_emails = FindEmails.emails;
-            initial_emails_formatted: list[str] = [email_node_to_string(email) for email in initial_emails];
-
-            # Update findings to conversation history
-            conversation_history.append({
-                "type": "found-emails", 
-                "content": summarize(initial_emails_formatted, conversation_history)
-            });
-
-            response = choose_initial_email_node(str(initial_emails_formatted), conversation_history);
-
-            # Log the agent's choice and reasoning
-            conversation_history.append({
-                "type": "agent-choice",
-                "content": f"Based on the found emails, I will proceed with option '{response.option}'. My selection is '{response.selection}' because: {response.explanation}"
-            });
-
-            # Extract relevant information
-            query = response.selection;
-            option = response.option;
-        }
-        if (response.option == "@end@"){
-            # If got answer from initial search, respond with answer
-            return respond_to_user(conversation_history);            
-        }
-        elif response.option == "@selected@" or query_counter == 4 {
-
-            # Select next email based on uuid
-            selected_email_node: EmailNode = None;
-            for email in initial_emails {
-                if(email.email_uuid == response.selection){
-                    selected_email_node = email;
-                    break;
-                }
-            }
-
-            # If next email not found, try again 4 more times (5 total)
-            selected_counter: int = 0;
-            while selected_email_node is None and selected_counter < 4 {
-                conversation_history.append({"type": "meta-error", "content": "Email UUID did not verbatim match. Retrying selection."});
-                response = retry_extract_identifier(conversation_history);
-
-                conversation_history.append({
-                    "type": "agent-retry-choice", 
-                    "content": f"My new selection is '{response.selection}' because: {response.explanation}"
-                });
-                for email in initial_emails {
-                    if(email.email_uuid == response.selection){
-                        selected_email_node = email;
-                        break;
-                    }
-                }
-                selected_counter += 1;
-            }
-
-            # Exits if still not found
-            if selected_email_node is None {
-                return "Error during email search please try again";
-            }
-            
-            # Goto next Email 
-            return selected_email_node;
-        }
-        else{
-            # This should never happen.
-            return "Error during email search please try again";
-        }
+    can handle_query with `root entry {
+        # Simply spawn the agent
+        root spawn EmailBuddyAgent(query=self.query, chat_history=self.chat_history);
     }
-
-
-    can handle_query with `root entry{
-
-        # Initialize conversation history
-        conversation_history.append({"role": "system_prompt", "content": sys_prompt});
-        conversation_history.append({"role": "user", "content": self.query});
-
-        # Start email search
-        value = self.handle_email_query(self.query);
-        if type(value) == str {
-            report {"response": value, "source": []};
-        }
-        elif type(value) == EmailNode {
-            visit value;
-        }
-        else {
-            report {"response": "Error", "source": []};
-        }
-    }
-
-    can handle_email_node with EmailNode entry {
-        
-        # Extract sender of email, recipients of email, body/date/subject of email (nodes and str)
-        sender: list[Person] = [here <-- (`?Person) ];
-        sender_formatted: list[str] = [person_node_to_string(person) for person in sender];
-
-        recipients: list[Person] = [here --> (`?Person)];
-        recipients_formatted: list[str] = [person_node_to_string(person) for person in recipients];
-
-        email_formatted: str = email_node_to_string(here);
-
-
-        # Merges people into one list for later search
-        search_pool: list[Person] = sender + recipients;
-
-        conversation_history.append({
-            "type": "found-people-at-email", 
-            "content": f"At email {email_formatted}. Found sender: {str(sender_formatted)} and recipients: {str(recipients_formatted)}."
-        });
-
-
-        # Choose next person node to explore
-        response = choose_next_person_node(str(sender_formatted), str(recipients_formatted), email_formatted, conversation_history);
-
-        # Update findings to conversation history
-        conversation_history.append({
-            "type": "agent-choice", 
-            "content": f"I am acting on '{response.option}'. I picked '{response.selection}' because: {response.explanation}"
-        });
-
-        # Handle next actions:
-        if response.option == "@end@" {
-            # If got answer from initial search, respond with answer
-            report {"response": respond_to_user(conversation_history), "source": []};            
-        }
-        elif response.option == "@selected@" {
-            # Select next person based on email address
-            selected_person_node: Person = None;
-            for person in search_pool {
-                if(person.email == response.selection){
-                    selected_person_node = person;
-                    break;
-                }
-            }
-
-            # if selected person not found, retry 4 times (5 total)
-            counter: int = 0;
-            while selected_person_node is None and counter < 4 {
-                conversation_history.append({"type": "meta-error", "content": "Email address did not verbatim match. Retrying selection."});
-                response = choose_next_person_node(str(sender_formatted), str(recipients_formatted), email_formatted, conversation_history);        
-                conversation_history.append({
-                    "type": "agent-retry-choice", 
-                    "content": f"I am acting on '{response.option}'. My new selection is '{response.selection}' because: {response.explanation}"
-                });
-                for person in search_pool {
-                    if(person.email == response.selection){
-                        selected_person_node = person;
-                        break;
-                    }
-                }
-                counter += 1;
-            }
-
-            # Exits if still not found
-            if selected_person_node is None {
-                report {"response": "Error during email search please try again", "source": []};
-            }
-            
-            # Goto next Person             
-            visit selected_person_node;
-        }
-        elif (response.option == "@query@"){
-            # Queries other emails using fuzzy vector search
-            value = self.handle_email_query(response.selection);
-            if type(value) == str {
-                report {"response": value, "source": []};
-            }
-            else{
-                visit value;
-            } 
-        }
-        else{
-            # This should never happen.
-            report {"response": "Error during email search please try again", "source": []};
-        }
-    }
-
-
-    can handle_person_node with Person entry {
-        
-        # Extract relevant info about current node to share to agent        
-        sent: list[EmailNode] = [here --> (`?EmailNode)];
-        sent_formatted: list[str] = [email_node_to_string(email) for email in sent];
-        
-        received: list[EmailNode] = [here <-- (`?EmailNode)];
-        received_formatted: list[str] = [email_node_to_string(email) for email in received];
-        
-        search_pool: list[EmailNode] = sent + received; 
-
-        person_formatted: str = person_node_to_string(here);
-
-        conversation_history.append({
-            "type": "found-emails-for-person",
-            "content": f"At person {person_formatted}. Found sent emails: {str(sent_formatted)} and received emails: {str(received_formatted)}."
-        });
-
-        response = choose_next_email_node(person_formatted, str(sent_formatted), str(received_formatted), conversation_history);
-
-
-        if response.option == "@end@" {
-            
-            conversation_history.append({
-                "type": "agent-choice", 
-                "content": f"I am ending the search. The answer is '{response.selection}' because: {response.explanation}"
-            });
-
-            report {"response": respond_to_user(conversation_history), "source": []};
-        }
-        elif response.option == "@query@" {
-            
-            conversation_history.append({
-                "type": "agent-choice", 
-                "content": f"I am starting a new query for '{response.selection}' because: {response.explanation}"
-            });
-
-            value = self.handle_email_query(response.selection);
-            
-            if type(value) == str {
-                report {"response": value, "source": []};
-            }
-            else{
-                visit value;
-            }
-        }
-        elif response.option == "@selected@" {
-
-            conversation_history.append({
-                "type": "agent-choice", 
-                "content": f"I am selecting email '{response.selection}' because: {response.explanation}"
-            });
-            
-            selected_email_node: EmailNode = None;
-            for email in search_pool {
-                if(email.email_uuid == response.selection){
-                    selected_email_node = email;
-                    break;
-                }
-            }
-
-            # If next email not found, try again 4 more times (5 total)
-            counter: int = 0;
-            while selected_email_node is None and counter < 4 {
-                conversation_history.append({"type": "meta-error", "content": "email uuid did not verbatim match try again"});
-                response = choose_next_email_node(person_formatted, str(sent_formatted), str(received_formatted), conversation_history);
-                
-                conversation_history.append({
-                    "type": "agent-retry-choice", 
-                    "content": f"I am acting on '{response.option}'. My new selection is '{response.selection}' because: {response.explanation}"
-                });
-            
-                for email in search_pool {
-                    if(email.email_uuid == response.selection){
-                        selected_email_node = email;
-                        break;
-                    }
-                }
-                counter += 1;
-            }
-
-            # Exits if still not found
-            if selected_email_node is None {
-                report {"response": "Error during email search please try again", "source": []};
-            }
-            
-            # Goto next Email 
-            visit selected_email_node;
-        }
-        else{
-            # This should never happen.
-            report {"response": "Error during email search please try again", "source": []};
-        }
-        
-    }
-
 }
